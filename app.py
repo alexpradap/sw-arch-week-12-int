@@ -1,33 +1,31 @@
 from flask import Flask, render_template, request, jsonify
 import json
 import mysql.connector
+import copy
 
 app = Flask(__name__)
 
 class Interprete:
     def __init__ (self, diccionario_ventas):
-        self.diccionario_ventas = diccionario_ventas
-        self.contador = 0
+        self.diccionario_ventas = copy.deepcopy(diccionario_ventas)
     def agregar_venta(self, nombre_empresa, fecha, valor_venta):
-        self.contador = self.contador + 1
-        prefix = "venta_"
-        self.diccionario_ventas["ventas"][f"{prefix}{self.contador}"] = {
+        self.diccionario_ventas["ventas"].append({
             "nombre_empresa": nombre_empresa,
             "fecha": fecha,
             "valor_venta": valor_venta
-        }
+        })
     def reiniciar_diccionario(self):
-        self.diccionario_ventas = ventas_init
-        self.contador = 0
+        self.diccionario_ventas = None
+        self.diccionario_ventas = copy.deepcopy(ventas_init)
 
 ventas_init = {
-    "ventas": {}
+    "ventas": []
 }
 
 db_config = {
     "host": "127.0.0.1",
     "user": "root",
-    "password": "mysql_admin_Colombia*1",
+    "password": "mysql_root_Colombia1",
     "database": "sw-arch"
 }
 conn = mysql.connector.connect(**db_config)
@@ -69,7 +67,7 @@ def reiniciar_diccionario():
 @app.route("/persistir_datos", methods=["GET"])
 def persistir_datos():
     insert_query = "INSERT INTO ventas (empresa_local, valor_venta, fecha_venta) VALUES (%s, %s, %s)"
-    for venta in interprete.diccionario_ventas:
+    for venta in interprete.diccionario_ventas["ventas"]:
         data_to_insert = (venta["nombre_empresa"], venta["valor_venta"], venta["fecha"])
         cursor.execute(insert_query, data_to_insert)
         conn.commit()
@@ -79,14 +77,14 @@ def persistir_datos():
 
 @app.route("/cargar_desde_db", methods=["GET"])
 def cargar_desde_db():
-    interprete.reiniciar_diccionario(ventas_init)
+    interprete.reiniciar_diccionario()
     select_query = "SELECT empresa_local, valor_venta, fecha_venta FROM ventas"
     cursor.execute(select_query)
     for venta in cursor.fetchall():
-        interprete.agregar_venta(venta["empresa_local"], venta["fecha_venta"], venta["valor_venta"])
+        interprete.agregar_venta(venta[0], venta[2], venta[1])
     cursor.close()
     conn.close()
-    return f"Datos persistidos en la db.", 200
+    return f"Datos cargados desde la db.", 200
 
 if __name__ == '__main__':
     app.run(debug=False)
